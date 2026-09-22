@@ -23,7 +23,9 @@ jobs:
           cache: true
 
       - name: Repair missing platform files (scaffold was manual)
-        run: flutter create . --org com.alexbabibop --project-name byahero --platforms android
+        run: |
+          rm -rf android
+          flutter create . --org com.alexbabibop --project-name byahero --platforms android
 
       - name: Create google-services.json from secret (optional)
         run: |
