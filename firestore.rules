@@ -1,0 +1,31 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users: sarili lang ang makakabasa/sulat ng sariling profile.
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+    // Journeys: private per user; basahin lang ang sarili.
+    match /journeys/{jid} {
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid;
+      allow read, update, delete: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+    }
+    // Posts: lahat ng login user makakabasa; author lang makaka-edit;
+    // votes via update na increment lang.
+    match /posts/{pid} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null;
+      allow delete: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+    }
+    // Bug reports: create lang ang user; admin lang ang read (palitan ng admin UID check).
+    match /bug_reports/{id} {
+      allow create: if request.auth != null;
+      allow read, update, delete: if false; // TODO: admin custom claim check
+    }
+  }
+}

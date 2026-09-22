@@ -1,0 +1,59 @@
+name: byahero
+description: "ByaHero - Ikaw ang bida sa byahe mo. Smart Commute Analytics, Anti-Tamper Delay Verification, Community Traffic App."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  provider: ^6.1.2
+
+  # Firebase
+  firebase_core: ^2.32.0
+  firebase_auth: ^4.19.0
+  cloud_firestore: ^4.17.0
+  firebase_storage: ^11.7.0
+  google_sign_in: ^6.2.1
+
+  # Maps & Location
+  google_maps_flutter: ^2.6.1
+  geolocator: ^11.0.0
+  geocoding: ^3.0.0
+  permission_handler: ^11.3.1
+
+  # Camera & Proof
+  camera: ^0.11.0
+  image: ^4.2.0
+  crypto: ^3.0.3
+  exif: ^3.3.0
+
+  # PDF Report
+  pdf: ^3.10.8
+  printing: ^5.13.0
+  path_provider: ^2.1.2
+  share_plus: ^10.0.3
+
+  # Offline & utils
+  sqflite: ^2.3.3
+  connectivity_plus: ^6.0.3
+  intl: ^0.19.0
+  uuid: ^4.4.0
+
+  # Telemetry / bug reports
+  device_info_plus: ^10.1.0
+  battery_plus: ^6.0.3
+  package_info_plus: ^8.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
