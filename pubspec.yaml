@@ -19,10 +19,10 @@ dependencies:
   firebase_storage: ^12.3.7
   google_sign_in: ^6.2.2
 
-  # Maps & Location
-  google_maps_flutter: ^2.6.1
-  geolocator: ^11.0.0
-  geocoding: ^3.0.0
+  # Maps & Location (upgraded — old geocoding_android was stuck on compileSdk 33)
+  google_maps_flutter: ^2.9.0
+  geolocator: ^12.0.0
+  geocoding: ^4.0.0
   permission_handler: ^11.3.1
 
   # Camera & Proof
