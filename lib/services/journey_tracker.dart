@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart';
 import 'package:uuid/uuid.dart';
 import '../models/journey.dart';
 
@@ -111,14 +110,9 @@ class JourneyTracker extends ChangeNotifier {
       _slowSince ??= DateTime.now();
       final slowFor = DateTime.now().difference(_slowSince!);
       if (slowFor.inMinutes >= 3 && !current!.autoLogs.any((l) => l.contains(_slowSince.toString()))) {
-        String place = '${pos.latitude.toStringAsFixed(4)}, ${pos.longitude.toStringAsFixed(4)}';
-        try {
-          final marks = await placemarkFromCoordinates(pos.latitude, pos.longitude);
-          if (marks.isNotEmpty) {
-            final m = marks.first;
-            place = [m.name, m.street, m.locality].where((e) => (e ?? '').isNotEmpty).join(', ');
-          }
-        } catch (_) {}
+        // MVP: coordinates muna (geocoding plugin tinanggal para iwas SDK/version conflict).
+        // TODO: ibalik ang reverse-geocode (placemark) kapag stable na ang geocoding plugin.
+        final place = '${pos.latitude.toStringAsFixed(4)}, ${pos.longitude.toStringAsFixed(4)}';
         current!.autoLogs.add(
           'Probably stopped near $place at ${_fmtTime(DateTime.now())} [slowSince=$_slowSince]',
         );
