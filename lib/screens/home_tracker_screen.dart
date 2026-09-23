@@ -411,7 +411,7 @@ class _LiveMapCardState extends State<_LiveMapCard> {
         _move();
       });
     } catch (e) {
-      if (mounted) setState(() => _err = 'No GPS fix: $e'));
+      if (mounted) setState(() => _err = 'No GPS fix: $e');
     }
   }
 
