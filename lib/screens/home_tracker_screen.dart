@@ -381,6 +381,10 @@ class _LiveMapCardState extends State<_LiveMapCard> {
   // Tanging i-on ang My-Location layer kapag granted na — kung hindi,
   // SecurityException at crash sa ilang devices (naobserbahan sa Android 16).
   bool _locOk = false;
+  // Galing sa --dart-define=MAPS_API_KEY (CI secret). Kapag walang key,
+  // huwag buuin ang GoogleMap — IllegalStateException + crash kung wala
+  // ang meta-data sa manifest.
+  static const _mapsKey = String.fromEnvironment('MAPS_API_KEY');
 
   @override
   void initState() {
@@ -493,18 +497,22 @@ class _LiveMapCardState extends State<_LiveMapCard> {
                     ),
                   )
                 // Native map SDK: huwag buuin hangga't walang granted
-                // permission — safe mode laban sa startup crash.
-                : !_locOk
-                    ? const Center(
+                // permission AT walang API key — crash kapag wala ang
+                // meta-data sa manifest (naobserbahan sa device).
+                : (!_locOk || _mapsKey.isEmpty)
+                    ? Center(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.map_outlined,
+                            const Icon(Icons.map_outlined,
                                 size: 40, color: Colors.grey),
-                            SizedBox(height: 8),
+                            const SizedBox(height: 8),
                             Text(
-                                'Live map magbubukas pagkatapos payagan ang Location.',
-                                style: TextStyle(
+                                _mapsKey.isEmpty
+                                    ? 'Live map: magdagdag ng Maps API key.\nRealtime coordinates nasa baba.'
+                                    : 'Live map magbubukas pagkatapos payagan ang Location.',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
                                     fontSize: 12, color: Colors.grey)),
                           ],
                         ),
