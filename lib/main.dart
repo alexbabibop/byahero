@@ -3,7 +3,6 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'services/journey_tracker.dart';
 import 'services/firestore_service.dart';
-import 'screens/auth_screen.dart';
 import 'screens/home_tracker_screen.dart';
 import 'firebase_options_stub.dart';
 

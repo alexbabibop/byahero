@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image/image.dart' as img;
@@ -13,7 +14,7 @@ import 'package:image/image.dart' as img;
 class ProofService {
   /// Tatakan ang [jpegBytes] ng watermark text sa ibaba.
   /// Ibalik ang bagong JPEG bytes.
-  static List<int> watermark(List<int> jpegBytes, {
+  static Uint8List watermark(Uint8List jpegBytes, {
     required Position pos,
     required DateTime ts,
     required String deviceHash,
@@ -22,10 +23,10 @@ class ProofService {
     if (image == null) return jpegBytes;
     final stamp =
         '${pos.latitude.toStringAsFixed(6)}, ${pos.longitude.toStringAsFixed(6)} | $ts | $deviceHash';
-    // Simpleng bottom bar + text (low-end safe, walang custom fonts).
+    // Simpleng bottom bar + text (low-end safe, built-in font).
     img.fillRect(image, x1: 0, y1: image.height - 48, x2: image.width, y2: image.height,
         color: img.ColorRgb8(0, 0, 0));
-    img.drawString(image, stamp, x: 8, y: image.height - 34,
+    img.drawString(image, stamp, font: img.arial14, x: 8, y: image.height - 34,
         color: img.ColorRgb8(255, 255, 255));
     return img.encodeJpg(image, quality: 85);
   }

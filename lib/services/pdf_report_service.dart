@@ -29,7 +29,7 @@ class PdfReportService {
                 style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
             pw.SizedBox(height: 4),
             pw.Text('Ikaw ang bida sa byahe mo.',
-                style: const pw.TextStyle(fontSize: 10)),
+                style: pw.TextStyle(fontSize: 10)),
             pw.Divider(),
             pw.Text('Employee: $userName  |  ID: $employeeId  |  Company: $company'),
             pw.Text(
@@ -57,11 +57,11 @@ class PdfReportService {
             pw.Spacer(),
             pw.Divider(),
             pw.Text('Timestamp hash: ${timestampHash ?? '—'}',
-                style: const pw.TextStyle(fontSize: 9)),
+                style: pw.TextStyle(fontSize: 9)),
             pw.SizedBox(height: 24),
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              children: const [
+              children: [
                 pw.Text('____________________\nEmployee signature'),
                 pw.Text('____________________\nSupervisor / HR'),
               ],
