@@ -3,7 +3,8 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'services/journey_tracker.dart';
 import 'services/firestore_service.dart';
-import 'screens/home_tracker_screen.dart';
+import 'screens/splash_screen.dart';
+import 'theme/app_theme.dart';
 import 'firebase_options_stub.dart';
 
 Future<void> main() async {
@@ -30,10 +31,7 @@ class ByaHeroApp extends StatelessWidget {
       child: MaterialApp(
         title: 'ByaHero',
         debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          useMaterial3: true,
-          colorSchemeSeed: const Color(0xFFD62828),
-        ),
+        theme: AppTheme.light(),
         home: const _Root(),
       ),
     );
@@ -55,7 +53,7 @@ class AuthGate extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // TODO: StreamBuilder FirebaseAuth.instance.authStateChanges()
-    // MVP: ipakita parehong auth + tracker entry.
-    return const HomeTrackerScreen();
+    // MVP: splash muna, tapos tracker.
+    return const SplashScreen();
   }
 }
