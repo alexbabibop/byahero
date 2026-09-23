@@ -20,7 +20,7 @@ class AuthScreen extends StatelessWidget {
             onPressed: () {
               // TODO: FirebaseAuth.instance.signInWithEmailAndPassword(...)
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('TODO: wire Firebase Auth'))),
+                const SnackBar(content: Text('TODO: wire Firebase Auth')));
             },
             child: const Text('Login'),
           ),
