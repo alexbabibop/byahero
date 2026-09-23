@@ -17,6 +17,7 @@ class JourneyTracker extends ChangeNotifier {
   Journey? current;
   JourneyState state = JourneyState.idle;
   VehicleMode mode = VehicleMode.bus;
+  String userId = 'local-user';
 
   StreamSubscription<Position>? _sub;
   DateTime? _slowSince;
@@ -57,7 +58,7 @@ class JourneyTracker extends ChangeNotifier {
     }
     current = Journey(
       id: const Uuid().v4(),
-      userId: 'local-user', // TODO: FirebaseAuth.instance.currentUser.uid
+      userId: userId,
       startedAt: DateTime.now(),
     )
       ..destLat = destLat

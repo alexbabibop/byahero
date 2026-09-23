@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../services/auth_service.dart';
+import '../services/journey_tracker.dart';
 import 'home_tracker_screen.dart';
 import 'proof_camera_screen.dart';
 import 'pdf_preview_screen.dart';
@@ -25,6 +28,10 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
+    // I-link ang journeys sa naka-login na account (o 'local-user' kung offline).
+    final tracker = context.read<JourneyTracker>();
+    tracker.userId =
+        context.watch<AuthService>().current()?.uid ?? 'local-user';
     return Scaffold(
       body: IndexedStack(index: _index, children: _pages),
       bottomNavigationBar: NavigationBar(

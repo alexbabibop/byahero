@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
+import 'services/auth_service.dart';
 import 'services/journey_tracker.dart';
 import 'services/firestore_service.dart';
 import 'screens/splash_screen.dart';
@@ -9,11 +10,16 @@ import 'firebase_options_stub.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Firebase init — palitan ng tunay na firebase_options.dart mula sa `flutterfire configure`
+  // 1) Native config (google-services.json) kung meron.
+  // 2) firebase_options_stub — palitan ng tunay na values mula sa
+  //    `flutterfire configure` o Firebase Console web config.
+  // Kapag parehong wala, offline mode (tracker + PDF gumagana locally).
   try {
-    await Firebase.initializeApp(options: firebaseOptionsStub);
+    await Firebase.initializeApp();
   } catch (_) {
-    // Tuloy pa rin sa offline mode (SQLite cache) kapag walang Firebase config.
+    try {
+      await Firebase.initializeApp(options: firebaseOptionsStub);
+    } catch (_) {}
   }
   runApp(const ByaHeroApp());
 }
@@ -27,6 +33,7 @@ class ByaHeroApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => JourneyTracker()),
         Provider(create: (_) => FirestoreService()),
+        ChangeNotifierProvider(create: (_) => AuthService()),
       ],
       child: MaterialApp(
         title: 'ByaHero',
