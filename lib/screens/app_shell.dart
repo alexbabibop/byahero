@@ -32,8 +32,10 @@ class _AppShellState extends State<AppShell> {
     final tracker = context.read<JourneyTracker>();
     tracker.userId =
         context.watch<AuthService>().current()?.uid ?? 'local-user';
+    // Sinasadyang LAZY (hindi IndexedStack): ang camera/maps native SDKs ay
+    // hindi dapat mag-init sa cold start — nag-crash sa ilang devices.
     return Scaffold(
-      body: IndexedStack(index: _index, children: _pages),
+      body: _pages[_index],
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),

@@ -492,7 +492,24 @@ class _LiveMapCardState extends State<_LiveMapCard> {
                               fontSize: 12, color: Colors.grey)),
                     ),
                   )
-                : GoogleMap(
+                // Native map SDK: huwag buuin hangga't walang granted
+                // permission — safe mode laban sa startup crash.
+                : !_locOk
+                    ? const Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.map_outlined,
+                                size: 40, color: Colors.grey),
+                            SizedBox(height: 8),
+                            Text(
+                                'Live map magbubukas pagkatapos payagan ang Location.',
+                                style: TextStyle(
+                                    fontSize: 12, color: Colors.grey)),
+                          ],
+                        ),
+                      )
+                    : GoogleMap(
                     initialCameraPosition: CameraPosition(
                       target: p != null
                           ? LatLng(p.latitude, p.longitude)

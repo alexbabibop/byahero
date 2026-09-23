@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'services/auth_service.dart';
@@ -8,11 +10,48 @@ import 'screens/splash_screen.dart';
 import 'theme/app_theme.dart';
 import 'firebase_options_stub.dart';
 
+final _navKey = GlobalKey<NavigatorState>();
+
+/// Global crash catcher: imbes na silent minimize, magpapakita ng
+/// error dialog na puwedeng kopyahin at isend (pang-debug sa device
+/// na walang Android Studio).
+void _showFatal(String title, String detail) {
+  final ctx = _navKey.currentContext;
+  if (ctx == null) return;
+  showDialog(
+    context: ctx,
+    barrierDismissible: false,
+    builder: (_) => AlertDialog(
+      title: Text(title),
+      content: SingleChildScrollView(child: Text(detail)),
+      actions: [
+        TextButton(
+          onPressed: () {
+            Clipboard.setData(ClipboardData(text: detail));
+            ScaffoldMessenger.of(ctx).showSnackBar(
+                const SnackBar(content: Text('Kinopya! Isend kay dev.')));
+          },
+          child: const Text('Kopyahin'),
+        ),
+        FilledButton(
+          onPressed: () =>
+              _navKey.currentState?.popUntil((r) => r.isFirst),
+          child: const Text('Balik sa app'),
+        ),
+      ],
+    ),
+  );
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  FlutterError.onError = (d) {
+    FlutterError.presentError(d);
+    _showFatal('May error ang app',
+        '${d.exceptionAsString()}\n\n${d.stack ?? ''}');
+  };
   // 1) Native config (google-services.json) kung meron.
-  // 2) firebase_options_stub — palitan ng tunay na values mula sa
-  //    `flutterfire configure` o Firebase Console web config.
+  // 2) firebase_options_stub — tunay na values ng byahero-3dea7.
   // Kapag parehong wala, offline mode (tracker + PDF gumagana locally).
   try {
     await Firebase.initializeApp();
@@ -21,7 +60,9 @@ Future<void> main() async {
       await Firebase.initializeApp(options: firebaseOptionsStub);
     } catch (_) {}
   }
-  runApp(const ByaHeroApp());
+  runZonedGuarded(() => runApp(const ByaHeroApp()), (e, s) {
+    _showFatal('Biglang error', '$e\n\n$s');
+  });
 }
 
 class ByaHeroApp extends StatelessWidget {
@@ -38,6 +79,7 @@ class ByaHeroApp extends StatelessWidget {
       child: MaterialApp(
         title: 'ByaHero',
         debugShowCheckedModeBanner: false,
+        navigatorKey: _navKey,
         theme: AppTheme.light(),
         home: const _Root(),
       ),

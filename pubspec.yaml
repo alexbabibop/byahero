@@ -1,7 +1,7 @@
 name: byahero
 description: "ByaHero - Ikaw ang bida sa byahe mo. Smart Commute Analytics, Anti-Tamper Delay Verification, Community Traffic App."
 publish_to: 'none'
-version: 1.0.1+2
+version: 1.0.2+3
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
