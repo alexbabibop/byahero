@@ -1,0 +1,63 @@
+import 'package:flutter/material.dart';
+import 'home_tracker_screen.dart';
+import 'proof_camera_screen.dart';
+import 'pdf_preview_screen.dart';
+import 'community_feed_screen.dart';
+import 'auth_screen.dart';
+
+/// Bottom-tab shell: lahat ng PRD functions, isang tap lang ang layo.
+class AppShell extends StatefulWidget {
+  const AppShell({super.key});
+  @override
+  State<AppShell> createState() => _AppShellState();
+}
+
+class _AppShellState extends State<AppShell> {
+  int _index = 0;
+
+  static const _pages = [
+    HomeTrackerScreen(),
+    ProofCameraScreen(),
+    PdfPreviewScreen(),
+    CommunityFeedScreen(),
+    AuthScreen(),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: IndexedStack(index: _index, children: _pages),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _index,
+        onDestinationSelected: (i) => setState(() => _index = i),
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.navigation_outlined),
+            selectedIcon: Icon(Icons.navigation_rounded),
+            label: 'Tracker',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.camera_alt_outlined),
+            selectedIcon: Icon(Icons.camera_alt_rounded),
+            label: 'Proof',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.picture_as_pdf_outlined),
+            selectedIcon: Icon(Icons.picture_as_pdf_rounded),
+            label: 'Reports',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.forum_outlined),
+            selectedIcon: Icon(Icons.forum_rounded),
+            label: 'Community',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person_rounded),
+            label: 'Account',
+          ),
+        ],
+      ),
+    );
+  }
+}

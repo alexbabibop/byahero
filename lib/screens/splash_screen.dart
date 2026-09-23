@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
-import 'home_tracker_screen.dart';
+import 'app_shell.dart';
 
 /// Soft startup splash: gradient + bida badge + tagline.
 /// In-app ito (hindi native) para hindi mabura ng CI android-regenerate.
@@ -31,7 +31,7 @@ class _SplashScreenState extends State<SplashScreen>
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
           transitionDuration: const Duration(milliseconds: 500),
-          pageBuilder: (_, __, ___) => const HomeTrackerScreen(),
+          pageBuilder: (_, __, ___) => const AppShell(),
           transitionsBuilder: (_, a, __, child) =>
               FadeTransition(opacity: a, child: child),
         ),
