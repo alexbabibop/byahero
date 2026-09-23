@@ -46,9 +46,6 @@ jobs:
             echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 -d > android/app/google-services.json
           fi
 
-      - name: pub upgrade majors (auto-fix old android plugins)
-        run: flutter pub upgrade --major-versions || flutter pub get
-
       - name: pub get
         run: flutter pub get
 
