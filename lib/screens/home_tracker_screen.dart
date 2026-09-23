@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import '../models/journey.dart';
 import '../services/journey_tracker.dart';
@@ -366,7 +367,7 @@ class HomeTrackerScreen extends StatelessWidget {
   }
 }
 
-/// Realtime GPS card + live route map (color-coded per vehicle mode).
+/// Realtime GPS card + live route map (OpenStreetMap — libre, walang API key).
 class _LiveMapCard extends StatefulWidget {
   const _LiveMapCard();
   @override
@@ -375,16 +376,11 @@ class _LiveMapCard extends StatefulWidget {
 
 class _LiveMapCardState extends State<_LiveMapCard> {
   StreamSubscription<Position>? _sub;
-  GoogleMapController? _map;
+  final _map = MapController();
   Position? _pos;
   String? _err;
-  // Tanging i-on ang My-Location layer kapag granted na — kung hindi,
-  // SecurityException at crash sa ilang devices (naobserbahan sa Android 16).
+  // Native map: huwag buuin hangga't walang granted permission (safe mode).
   bool _locOk = false;
-  // Galing sa --dart-define=MAPS_API_KEY (CI secret). Kapag walang key,
-  // huwag buuin ang GoogleMap — IllegalStateException + crash kung wala
-  // ang meta-data sa manifest.
-  static const _mapsKey = String.fromEnvironment('MAPS_API_KEY');
 
   @override
   void initState() {
@@ -424,17 +420,17 @@ class _LiveMapCardState extends State<_LiveMapCard> {
   }
 
   void _move() {
-    final c = _map;
     final p = _pos;
-    if (c != null && p != null) {
-      c.animateCamera(CameraUpdate.newLatLng(LatLng(p.latitude, p.longitude)));
-    }
+    if (p == null) return;
+    try {
+      _map.move(LatLng(p.latitude, p.longitude), _map.camera.zoom);
+    } catch (_) {}
   }
 
   @override
   void dispose() {
     _sub?.cancel();
-    _map?.dispose();
+    _map.dispose();
     super.dispose();
   }
 
@@ -451,31 +447,34 @@ class _LiveMapCardState extends State<_LiveMapCard> {
         segs.last.add(pt);
       }
     }
-    final polylines = <Polyline>{};
+    final lines = <Polyline>[];
     for (var i = 0; i < segs.length; i++) {
       if (segs[i].length < 2) continue;
-      polylines.add(Polyline(
-        polylineId: PolylineId('seg_$i'),
+      lines.add(Polyline(
         points: segs[i].map((e) => LatLng(e.lat, e.lng)).toList(),
         color: segs[i].first.mode.color,
-        width: 5,
+        strokeWidth: 5,
       ));
     }
-    final markers = <Marker>{};
+    final marks = <Marker>[];
     final p = _pos;
     if (p != null) {
-      markers.add(Marker(
-        markerId: const MarkerId('me'),
-        position: LatLng(p.latitude, p.longitude),
-        infoWindow: const InfoWindow(title: 'Ikaw (live)'),
+      marks.add(Marker(
+        point: LatLng(p.latitude, p.longitude),
+        width: 40,
+        height: 40,
+        child: const Icon(Icons.my_location,
+            color: AppTheme.brandRed, size: 32),
       ));
     }
     final dest = tracker.current;
     if (dest?.destLat != null && dest?.destLng != null) {
-      markers.add(Marker(
-        markerId: const MarkerId('dest'),
-        position: LatLng(dest!.destLat!, dest.destLng!),
-        infoWindow: InfoWindow(title: dest.destLabel ?? 'Destination'),
+      marks.add(Marker(
+        point: LatLng(dest!.destLat!, dest.destLng!),
+        width: 40,
+        height: 40,
+        child: const Icon(Icons.flag_rounded,
+            color: Colors.green, size: 32),
       ));
     }
 
@@ -496,43 +495,43 @@ class _LiveMapCardState extends State<_LiveMapCard> {
                               fontSize: 12, color: Colors.grey)),
                     ),
                   )
-                // Native map SDK: huwag buuin hangga't walang granted
-                // permission AT walang API key — crash kapag wala ang
-                // meta-data sa manifest (naobserbahan sa device).
-                : (!_locOk || _mapsKey.isEmpty)
-                    ? Center(
+                // OpenStreetMap: walang API key, walang billing.
+                // Huwag buuin hangga't walang granted permission.
+                : !_locOk
+                    ? const Center(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.map_outlined,
+                            Icon(Icons.map_outlined,
                                 size: 40, color: Colors.grey),
-                            const SizedBox(height: 8),
+                            SizedBox(height: 8),
                             Text(
-                                _mapsKey.isEmpty
-                                    ? 'Live map: magdagdag ng Maps API key.\nRealtime coordinates nasa baba.'
-                                    : 'Live map magbubukas pagkatapos payagan ang Location.',
+                                'Live map magbubukas pagkatapos payagan ang Location.',
                                 textAlign: TextAlign.center,
-                                style: const TextStyle(
+                                style: TextStyle(
                                     fontSize: 12, color: Colors.grey)),
                           ],
                         ),
                       )
-                    : GoogleMap(
-                    initialCameraPosition: CameraPosition(
-                      target: p != null
-                          ? LatLng(p.latitude, p.longitude)
-                          : const LatLng(14.5995, 120.9842),
-                      zoom: 15,
-                    ),
-                    myLocationEnabled: _locOk,
-                    myLocationButtonEnabled: _locOk,
-                    markers: markers,
-                    polylines: polylines,
-                    onMapCreated: (c) {
-                      _map = c;
-                      _move();
-                    },
-                  ),
+                    : FlutterMap(
+                        mapController: _map,
+                        options: MapOptions(
+                          initialCenter: p != null
+                              ? LatLng(p.latitude, p.longitude)
+                              : const LatLng(14.5995, 120.9842),
+                          initialZoom: 15,
+                        ),
+                        children: [
+                          TileLayer(
+                            urlTemplate:
+                                'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                            userAgentPackageName:
+                                'com.alexbabibop.byahero',
+                          ),
+                          PolylineLayer(polylines: lines),
+                          MarkerLayer(markers: marks),
+                        ],
+                      ),
           ),
           Padding(
             padding:
