@@ -73,9 +73,42 @@ class HomeTrackerScreen extends StatelessWidget {
               FilledButton.icon(
                 icon: const Icon(Icons.play_arrow),
                 label: const Text('Start Journey'),
-                onPressed: () => tracker.startJourney(
-                  destLat: 14.5547, destLng: 121.0244, destLabel: 'DOE BGC (sample)'),
+                onPressed: () async {
+                  // Prominent disclosure (Play Store requirement) bago mag-track.
+                  final ok = await showDialog<bool>(
+                    context: context,
+                    builder: (_) => AlertDialog(
+                      title: const Text('Location disclosure'),
+                      content: const Text(
+                        'Kokolektahin ng ByaHero ang precise location mo habang active ang journey para sa commute tracking at delay proof. Naka-store ito sa Firebase account mo at hindi ibinebenta.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text('Cancel')),
+                        FilledButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          child: const Text('I agree — Start')),
+                      ],
+                    ),
+                  );
+                  if (ok != true) return;
+                  try {
+                    await tracker.startJourney(
+                      destLat: 14.5547, destLng: 121.0244, destLabel: 'DOE BGC (sample)');
+                  } catch (e) {
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(e.toString()), duration: const Duration(seconds: 6)));
+                  }
+                },
               ),
+              if (tracker.lastError != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(tracker.lastError!,
+                      style: const TextStyle(color: Colors.red, fontSize: 12)),
+                ),
               const SizedBox(height: 8),
               const Text(
                 'Paalala: hihingi ng Location permission. May prominent disclosure bago mag-track (Play Store requirement).',

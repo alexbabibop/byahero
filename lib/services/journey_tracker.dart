@@ -29,10 +29,31 @@ class JourneyTracker extends ChangeNotifier {
   bool get isActive => state == JourneyState.active;
   bool get isPaused => state == JourneyState.paused;
 
+  String? lastError;
+
   Future<void> startJourney({double? destLat, double? destLng, String? destLabel}) async {
-    final perm = await Geolocator.checkPermission();
+    lastError = null;
+    // Location services check.
+    final serviceOn = await Geolocator.isLocationServiceEnabled();
+    if (!serviceOn) {
+      lastError = 'Naka-off ang Location/GPS ng phone. I-on muna sa Settings → Location.';
+      notifyListeners();
+      throw StateError(lastError!);
+    }
+    // Permission flow (kasama ang deniedForever).
+    var perm = await Geolocator.checkPermission();
     if (perm == LocationPermission.denied) {
-      await Geolocator.requestPermission();
+      perm = await Geolocator.requestPermission();
+    }
+    if (perm == LocationPermission.denied) {
+      lastError = 'Denied ang Location permission. Payagan sa popup o sa App Settings.';
+      notifyListeners();
+      throw StateError(lastError!);
+    }
+    if (perm == LocationPermission.deniedForever) {
+      lastError = 'Naka-"Don\'t allow" forever ang Location. Buksan: Settings → Apps → ByaHero → Permissions → Location → Allow.';
+      notifyListeners();
+      throw StateError(lastError!);
     }
     current = Journey(
       id: const Uuid().v4(),

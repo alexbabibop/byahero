@@ -40,6 +40,29 @@ jobs:
             grep -n "compileSdk\|agp" android/build.gradle.kts || true
           fi
 
+      - name: Inject Android permissions (regenerated manifest wipes them)
+        run: |
+          python3 - <<'EOF'
+          import re, pathlib
+          p = pathlib.Path("android/app/src/main/AndroidManifest.xml")
+          assert p.exists(), "manifest missing"
+          t = p.read_text()
+          perms = [
+              "android.permission.ACCESS_FINE_LOCATION",
+              "android.permission.ACCESS_COARSE_LOCATION",
+              "android.permission.ACCESS_BACKGROUND_LOCATION",
+              "android.permission.CAMERA",
+              "android.permission.FOREGROUND_SERVICE",
+              "android.permission.FOREGROUND_SERVICE_LOCATION",
+          ]
+          add = "".join(f'\n    <uses-permission android:name="{x}" />' for x in perms if x not in t)
+          t, n = re.subn(r"(<manifest[^>]*>)", r"\1" + add, t, count=1)
+          assert n == 1, "manifest tag not found"
+          p.write_text(t)
+          print("permissions injected")
+          EOF
+          grep -n "uses-permission" android/app/src/main/AndroidManifest.xml || true
+
       - name: Create google-services.json from secret (optional)
         run: |
           if [ -n "${{ secrets.GOOGLE_SERVICES_JSON }}" ]; then
