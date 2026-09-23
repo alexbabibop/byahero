@@ -378,6 +378,9 @@ class _LiveMapCardState extends State<_LiveMapCard> {
   GoogleMapController? _map;
   Position? _pos;
   String? _err;
+  // Tanging i-on ang My-Location layer kapag granted na — kung hindi,
+  // SecurityException at crash sa ilang devices (naobserbahan sa Android 16).
+  bool _locOk = false;
 
   @override
   void initState() {
@@ -398,6 +401,7 @@ class _LiveMapCardState extends State<_LiveMapCard> {
         }
         return;
       }
+      if (mounted) setState(() => _locOk = true);
       _pos = await Geolocator.getCurrentPosition()
           .timeout(const Duration(seconds: 10));
       if (mounted) setState(() {});
@@ -495,8 +499,8 @@ class _LiveMapCardState extends State<_LiveMapCard> {
                           : const LatLng(14.5995, 120.9842),
                       zoom: 15,
                     ),
-                    myLocationEnabled: true,
-                    myLocationButtonEnabled: true,
+                    myLocationEnabled: _locOk,
+                    myLocationButtonEnabled: _locOk,
                     markers: markers,
                     polylines: polylines,
                     onMapCreated: (c) {
