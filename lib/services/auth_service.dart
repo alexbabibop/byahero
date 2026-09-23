@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -6,8 +7,11 @@ import 'package:google_sign_in/google_sign_in.dart';
 
 /// Tunay na account system: Email register/login + Google Sign-In.
 /// Kapag walang Firebase config ang build (offline mode), nagtatapon ng
-/// malinaw na error imbes na silent fail.
+/// malinaw na error imbes na silent fail. Lahat ng network calls may
+/// timeout para hindi mag-spinner nang walang hanggan.
 class AuthService extends ChangeNotifier {
+  static const _timeout = Duration(seconds: 25);
+
   bool busy = false;
   String? lastError;
 
@@ -41,17 +45,25 @@ class AuthService extends ChangeNotifier {
     lastError = null;
     notifyListeners();
     try {
-      final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: email.trim(),
-        password: password,
-      );
+      final cred = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(
+            email: email.trim(),
+            password: password,
+          )
+          .timeout(_timeout);
       if (name != null && name.trim().isNotEmpty) {
-        await cred.user?.updateDisplayName(name.trim());
+        await cred.user
+            ?.updateDisplayName(name.trim())
+            .timeout(const Duration(seconds: 10));
       }
       await _saveProfile(cred.user);
       return cred.user!;
     } on FirebaseAuthException catch (e) {
       lastError = _msg(e);
+      notifyListeners();
+      throw StateError(lastError!);
+    } on TimeoutException {
+      lastError = 'Nagal-timeout. I-check ang internet connection at ulitin.';
       notifyListeners();
       throw StateError(lastError!);
     } finally {
@@ -66,14 +78,20 @@ class AuthService extends ChangeNotifier {
     lastError = null;
     notifyListeners();
     try {
-      final cred = await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: email.trim(),
-        password: password,
-      );
+      final cred = await FirebaseAuth.instance
+          .signInWithEmailAndPassword(
+            email: email.trim(),
+            password: password,
+          )
+          .timeout(_timeout);
       await _saveProfile(cred.user);
       return cred.user!;
     } on FirebaseAuthException catch (e) {
       lastError = _msg(e);
+      notifyListeners();
+      throw StateError(lastError!);
+    } on TimeoutException {
+      lastError = 'Nagal-timeout. I-check ang internet connection at ulitin.';
       notifyListeners();
       throw StateError(lastError!);
     } finally {
@@ -88,18 +106,25 @@ class AuthService extends ChangeNotifier {
     lastError = null;
     notifyListeners();
     try {
-      final g = await GoogleSignIn().signIn();
+      final g =
+          await GoogleSignIn().signIn().timeout(_timeout);
       if (g == null) throw StateError('Cancelled ang Google sign-in.');
-      final ga = await g.authentication;
+      final ga = await g.authentication.timeout(_timeout);
       final cred = GoogleAuthProvider.credential(
         accessToken: ga.accessToken,
         idToken: ga.idToken,
       );
-      final res = await FirebaseAuth.instance.signInWithCredential(cred);
+      final res = await FirebaseAuth.instance
+          .signInWithCredential(cred)
+          .timeout(_timeout);
       await _saveProfile(res.user);
       return res.user!;
     } on FirebaseAuthException catch (e) {
       lastError = _msg(e);
+      notifyListeners();
+      throw StateError(lastError!);
+    } on TimeoutException {
+      lastError = 'Nagal-timeout. I-check ang internet connection at ulitin.';
       notifyListeners();
       throw StateError(lastError!);
     } finally {
@@ -111,7 +136,7 @@ class AuthService extends ChangeNotifier {
   Future<void> signOut() async {
     if (!available) return;
     try {
-      await GoogleSignIn().signOut();
+      await GoogleSignIn().signOut().timeout(const Duration(seconds: 10));
     } catch (_) {}
     await FirebaseAuth.instance.signOut();
     notifyListeners();
@@ -128,7 +153,7 @@ class AuthService extends ChangeNotifier {
           'updatedAt': FieldValue.serverTimestamp(),
         },
         SetOptions(merge: true),
-      );
+      ).timeout(const Duration(seconds: 10));
     } catch (_) {}
   }
 

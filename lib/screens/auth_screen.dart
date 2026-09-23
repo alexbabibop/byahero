@@ -24,9 +24,17 @@ class _AuthScreenState extends State<AuthScreen> {
     super.dispose();
   }
 
-  Future<void> _run(Future Function() fn) async {
+  Future<void> _run(Future Function() fn, {String? successMsg}) async {
     try {
       await fn();
+      if (!mounted || successMsg == null) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(successMsg),
+          backgroundColor: Colors.green.shade700,
+          duration: const Duration(seconds: 3),
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -117,9 +125,15 @@ class _AuthScreenState extends State<AuthScreen> {
           FilledButton(
             onPressed: auth.busy
                 ? null
-                : () => _run(() => _loginMode
-                    ? auth.signIn(_email.text, _pass.text)
-                    : auth.signUp(_email.text, _pass.text, name: _name.text)),
+                : () => _run(
+                      () => _loginMode
+                          ? auth.signIn(_email.text, _pass.text)
+                          : auth.signUp(_email.text, _pass.text,
+                              name: _name.text),
+                      successMsg: _loginMode
+                          ? 'Welcome back sa ByaHero!'
+                          : 'Account created! Welcome sa ByaHero!',
+                    ),
             child: auth.busy
                 ? const SizedBox(
                     width: 20, height: 20,
@@ -130,8 +144,15 @@ class _AuthScreenState extends State<AuthScreen> {
           OutlinedButton.icon(
             icon: const Icon(Icons.g_mobiledata_rounded, size: 28),
             label: const Text('Continue with Google'),
-            onPressed:
-                auth.busy ? null : () => _run(auth.signInWithGoogle),
+            onPressed: auth.busy
+                ? null
+                : () => _run(auth.signInWithGoogle,
+                    successMsg: 'Welcome sa ByaHero!'),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Note: ang Google button ay nangangailangan ng SHA-1 ng app na naka-register sa Firebase (tingnan ang guide). Kung nag-error 10, gamitin muna ang email.',
+            style: TextStyle(fontSize: 11, color: Colors.grey),
           ),
           if (auth.lastError != null)
             Padding(

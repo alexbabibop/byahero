@@ -72,6 +72,54 @@ jobs:
             echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 -d > android/app/google-services.json
           fi
 
+      - name: Apply google-services Gradle plugin (only with secret)
+        run: |
+          if [ -z "${{ secrets.GOOGLE_SERVICES_JSON }}" ]; then
+            echo "no secret, skipping"
+            exit 0
+          fi
+          python3 - <<'EOF'
+          import pathlib
+          s = pathlib.Path("android/settings.gradle.kts")
+          if s.exists():
+              t = s.read_text()
+              if "google-services" not in t:
+                  t = t.replace("plugins {", 'plugins {\n    id("com.google.gms.google-services") version "4.4.2" apply false', 1)
+                  s.write_text(t)
+                  print("settings patched")
+          a = pathlib.Path("android/app/build.gradle.kts")
+          if a.exists():
+              t = a.read_text()
+              if '"com.google.gms.google-services"' not in t and "'com.google.gms.google-services'" not in t:
+                  t = t.replace("plugins {", 'plugins {\n    id("com.google.gms.google-services")', 1)
+                  a.write_text(t)
+                  print("app patched")
+          EOF
+
+      - name: Inject Maps API key into manifest (only with secret)
+        run: |
+          if [ -z "${{ secrets.MAPS_API_KEY }}" ]; then
+            echo "no maps key, skipping"
+            exit 0
+          fi
+          python3 - <<'EOF'
+          import os, re, pathlib
+          key = os.environ.get("MAPS_KEY", "")
+          assert key, "empty key"
+          p = pathlib.Path("android/app/src/main/AndroidManifest.xml")
+          t = p.read_text()
+          meta = f'\n        <meta-data android:name="com.google.android.geo.API_KEY" android:value="{key}" />'
+          if "com.google.android.geo.API_KEY" not in t:
+              t, n = re.subn(r"(<application[^>]*>)", r"\1" + meta, t, count=1)
+              assert n == 1, "application tag not found"
+              p.write_text(t)
+              print("maps key injected")
+          else:
+              print("maps key already present")
+          EOF
+        env:
+          MAPS_KEY: ${{ secrets.MAPS_API_KEY }}
+
       - name: pub get
         run: flutter pub get
 
@@ -80,6 +128,9 @@ jobs:
 
       - name: Build release APK
         run: flutter build apk --release --dart-define=MAPS_API_KEY=${{ secrets.MAPS_API_KEY }}
+
+      - name: Print APK SHA-1 (iregister sa Firebase para sa Google Sign-In)
+        run: keytool -printcert -jarfile build/app/outputs/flutter-apk/app-release.apk | grep -i sha1 || true
 
       - name: Upload APK
         uses: actions/upload-artifact@v4

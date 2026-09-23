@@ -45,6 +45,29 @@ class AppTheme {
         fillColor: Colors.white,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
       ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: Colors.white,
+        elevation: 8,
+        indicatorColor: brandRed.withOpacity(0.15),
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          final sel = states.contains(WidgetState.selected);
+          return TextStyle(
+            fontSize: 12,
+            fontWeight: sel ? FontWeight.w800 : FontWeight.w500,
+            color: sel ? brandRed : Colors.grey[600],
+          );
+        }),
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          final sel = states.contains(WidgetState.selected);
+          return IconThemeData(
+              color: sel ? brandRed : Colors.grey[600], size: 24);
+        }),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12)),
+      ),
     );
   }
 }

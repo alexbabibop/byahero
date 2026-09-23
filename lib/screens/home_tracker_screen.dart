@@ -1,4 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import '../models/journey.dart';
 import '../services/journey_tracker.dart';
@@ -164,6 +167,8 @@ class HomeTrackerScreen extends StatelessWidget {
                 ),
               ),
             ),
+            const SizedBox(height: 14),
+            const _LiveMapCard(),
             const SizedBox(height: 14),
             if (j == null) ...[
               FilledButton.icon(
@@ -355,6 +360,164 @@ class HomeTrackerScreen extends StatelessWidget {
               style: TextStyle(
                   fontSize: 10,
                   color: highlight ? Colors.white70 : Colors.grey)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Realtime GPS card + live route map (color-coded per vehicle mode).
+class _LiveMapCard extends StatefulWidget {
+  const _LiveMapCard();
+  @override
+  State<_LiveMapCard> createState() => _LiveMapCardState();
+}
+
+class _LiveMapCardState extends State<_LiveMapCard> {
+  StreamSubscription<Position>? _sub;
+  GoogleMapController? _map;
+  Position? _pos;
+  String? _err;
+
+  @override
+  void initState() {
+    super.initState();
+    _listen();
+  }
+
+  Future<void> _listen() async {
+    try {
+      var p = await Geolocator.checkPermission();
+      if (p == LocationPermission.denied) {
+        p = await Geolocator.requestPermission();
+      }
+      if (p == LocationPermission.denied ||
+          p == LocationPermission.deniedForever) {
+        if (mounted) {
+          setState(() => _err = 'Payagan ang Location para sa live map.');
+        }
+        return;
+      }
+      _pos = await Geolocator.getCurrentPosition()
+          .timeout(const Duration(seconds: 10));
+      if (mounted) setState(() {});
+      _move();
+      _sub = Geolocator.getPositionStream(
+        locationSettings:
+            const LocationSettings(accuracy: LocationAccuracy.high),
+      ).listen((e) {
+        _pos = e;
+        if (mounted) setState(() {});
+        _move();
+      });
+    } catch (e) {
+      if (mounted) setState(() => _err = 'No GPS fix: $e'));
+    }
+  }
+
+  void _move() {
+    final c = _map;
+    final p = _pos;
+    if (c != null && p != null) {
+      c.animateCamera(CameraUpdate.newLatLng(LatLng(p.latitude, p.longitude)));
+    }
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    _map?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tracker = context.watch<JourneyTracker>();
+    final pts = tracker.current?.points ?? [];
+    // Color-coded segments: hati kapag nagbago ang mode.
+    final segs = <List<RoutePoint>>[];
+    for (final pt in pts) {
+      if (segs.isEmpty || segs.last.last.mode != pt.mode) {
+        segs.add([pt]);
+      } else {
+        segs.last.add(pt);
+      }
+    }
+    final polylines = <Polyline>{};
+    for (var i = 0; i < segs.length; i++) {
+      if (segs[i].length < 2) continue;
+      polylines.add(Polyline(
+        polylineId: PolylineId('seg_$i'),
+        points: segs[i].map((e) => LatLng(e.lat, e.lng)).toList(),
+        color: segs[i].first.mode.color,
+        width: 5,
+      ));
+    }
+    final markers = <Marker>{};
+    final p = _pos;
+    if (p != null) {
+      markers.add(Marker(
+        markerId: const MarkerId('me'),
+        position: LatLng(p.latitude, p.longitude),
+        infoWindow: const InfoWindow(title: 'Ikaw (live)'),
+      ));
+    }
+    final dest = tracker.current;
+    if (dest?.destLat != null && dest?.destLng != null) {
+      markers.add(Marker(
+        markerId: const MarkerId('dest'),
+        position: LatLng(dest!.destLat!, dest.destLng!),
+        infoWindow: InfoWindow(title: dest.destLabel ?? 'Destination'),
+      ));
+    }
+
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            height: 210,
+            child: _err != null
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text(_err!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                              fontSize: 12, color: Colors.grey)),
+                    ),
+                  )
+                : GoogleMap(
+                    initialCameraPosition: CameraPosition(
+                      target: p != null
+                          ? LatLng(p.latitude, p.longitude)
+                          : const LatLng(14.5995, 120.9842),
+                      zoom: 15,
+                    ),
+                    myLocationEnabled: true,
+                    myLocationButtonEnabled: true,
+                    markers: markers,
+                    polylines: polylines,
+                    onMapCreated: (c) {
+                      _map = c;
+                      _move();
+                    },
+                  ),
+          ),
+          Padding(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: p == null
+                ? const Text('Naghahanap ng GPS fix…',
+                    style: TextStyle(fontSize: 12, color: Colors.grey))
+                : Text(
+                    'Live: ${p.latitude.toStringAsFixed(5)}, ${p.longitude.toStringAsFixed(5)}'
+                    '  •  ±${p.accuracy.toStringAsFixed(0)}m'
+                    '  •  ${(p.speed * 3.6).toStringAsFixed(1)} km/h',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+          ),
         ],
       ),
     );
