@@ -26,6 +26,20 @@ jobs:
           rm -rf android
           flutter create . --org com.alexbabibop --project-name byahero --platforms android
 
+      - name: Bump compileSdk to 34 (geocoding_android requirement)
+        run: |
+          if [ -f android/app/build.gradle.kts ]; then
+            sed -i 's/compileSdk.*/compileSdk = 34/' android/app/build.gradle.kts
+            grep -n "compileSdk" android/app/build.gradle.kts || true
+          fi
+          if [ -f android/app/build.gradle ]; then
+            sed -i 's/compileSdkVersion.*/compileSdkVersion 34/' android/app/build.gradle
+            grep -n "compileSdk" android/app/build.gradle || true
+          fi
+          if [ -f android/build.gradle.kts ]; then
+            grep -n "compileSdk\|agp" android/build.gradle.kts || true
+          fi
+
       - name: Create google-services.json from secret (optional)
         run: |
           if [ -n "${{ secrets.GOOGLE_SERVICES_JSON }}" ]; then
