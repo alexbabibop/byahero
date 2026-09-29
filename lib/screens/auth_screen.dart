@@ -57,15 +57,14 @@ class _AuthScreenState extends State<AuthScreen> {
   Future<void> _submit(AuthService auth) async {
     setState(() => _tried = true);
     if (!(_formKey.currentState?.validate() ?? false)) return;
+    // Kunin ang deps BAGO mag-await — walang context pagkatapos.
+    final store = context.read<JourneyTracker>().store;
+    final fs = context.read<FirestoreService>();
     try {
       final User u = _loginMode
           ? await auth.signIn(_email.text, _pass.text)
           : await auth.signUp(_email.text, _pass.text, name: _name.text);
-      final n = await SyncService.sync(
-        store: context.read<JourneyTracker>().store,
-        fs: context.read<FirestoreService>(),
-        uid: u.uid,
-      );
+      final n = await SyncService.sync(store: store, fs: fs, uid: u.uid);
       if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..clearSnackBars()
@@ -87,13 +86,11 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Future<void> _runGoogle(AuthService auth) async {
+    final store = context.read<JourneyTracker>().store;
+    final fs = context.read<FirestoreService>();
     try {
       final u = await auth.signInWithGoogle();
-      final n = await SyncService.sync(
-        store: context.read<JourneyTracker>().store,
-        fs: context.read<FirestoreService>(),
-        uid: u.uid,
-      );
+      final n = await SyncService.sync(store: store, fs: fs, uid: u.uid);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(n > 0

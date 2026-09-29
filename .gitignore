@@ -11,6 +11,10 @@ build/
 *.iws
 
 # ---> Android
+# Ang android/ folder ay HINDI nire-commit: binubuo ito ng CI sa bawat build
+# (flutter create .) kaya laging fresh at compatible sa Flutter version.
+# Ito rin ang dahil hindi nasisira ang build kapag may bagong Flutter release.
+/android/
 **/android/**/build/
 **/android/.gradle/
 **/android/captures/

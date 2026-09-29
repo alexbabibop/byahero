@@ -95,6 +95,7 @@ class _JourneyHistoryScreenState extends State<JourneyHistoryScreen> {
   }
 
   Future<void> _delete(Journey j) async {
+    final store = context.read<JourneyTracker>().store;
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -113,7 +114,7 @@ class _JourneyHistoryScreenState extends State<JourneyHistoryScreen> {
       ),
     );
     if (ok != true) return;
-    await context.read<JourneyTracker>().store.remove(j.id);
+    await store.remove(j.id);
     await _load();
     if (mounted) _toast('Nabura ang byahe.');
   }
@@ -215,10 +216,10 @@ class _JourneyHistoryScreenState extends State<JourneyHistoryScreen> {
   }
 
   Widget _emptyState() {
-    return Card(
+    return const Card(
       child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(children: const [
+        padding: EdgeInsets.all(24),
+        child: Column(children: [
           Icon(Icons.route_rounded, size: 46, color: AppTheme.line),
           SizedBox(height: 12),
           Text('Wala pang naseserve na byahe',

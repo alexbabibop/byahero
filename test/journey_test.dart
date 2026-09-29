@@ -5,15 +5,24 @@ import 'package:flutter_test/flutter_test.dart';
 /// model math, at theme consistency.
 void main() {
   group('Journey math', () {
-    Journey mk(List<(int sec, VehicleMode mode)> legs) {
+    /// (segundo, mode) — ang mode ay siyang SUMUSAKLAP sa segment na
+    /// mula sa point i hanggang point i+1 ( gaya ng totoong GPS stream).
+    Journey mk(List<(int, VehicleMode)> segs) {
       final start = DateTime(2026, 1, 1, 7);
       final j = Journey(id: 'j1', userId: 'guest', startedAt: start);
       var t = start;
-      for (final (sec, mode) in legs) {
-        t = t.add(Duration(seconds: sec));
+      for (final (sec, mode) in segs) {
         j.points.add(RoutePoint(
             lat: 14.5, lng: 121.0, timestamp: t, mode: mode, speedKmh: 20));
+        t = t.add(Duration(seconds: sec));
       }
+      // Dulo ng huling segment.
+      j.points.add(RoutePoint(
+          lat: 14.5,
+          lng: 121.0,
+          timestamp: t,
+          mode: segs.last.$2,
+          speedKmh: 20));
       j.endedAt = t;
       return j;
     }
@@ -43,11 +52,17 @@ void main() {
       expect(j.movingTime.inSeconds, 120);
     });
 
-    test('zero points => zero mode times (no crash)', () {
-      final j = Journey(
-          id: 'j2', userId: 'guest', startedAt: DateTime(2026, 1, 1));
+    test('zero points => zero mode times (no crash, no bogus number)', () {
+      final j =
+          Journey(id: 'j2', userId: 'guest', startedAt: DateTime(2026, 1, 1));
       expect(j.waitingTime.inSeconds, 0);
       expect(j.movingTime.inSeconds, 0);
+    });
+
+    test('one segment => lahat moving', () {
+      final j = mk([(30, VehicleMode.bus)]);
+      expect(j.points.length, 2);
+      expect(j.movingTime.inSeconds, 30);
     });
   });
 
@@ -97,7 +112,7 @@ void main() {
         ..endedAt = start;
       final row = j.toStorage(synced: 0);
       // corrupt the mode name
-      final pts = '[{"lat":14.5,"lng":121.0,"ts":"2026-02-03T06:30:00.000","mode":"ufo","speedKmh":1}]';
+      const pts = '[{"lat":14.5,"lng":121.0,"ts":"2026-02-03T06:30:00.000","mode":"ufo","speedKmh":1}]';
       final back = Journey.fromStorage({...row, 'points': pts});
       expect(back.points.first.mode, VehicleMode.bus);
     });

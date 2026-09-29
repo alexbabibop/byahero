@@ -116,7 +116,16 @@ class Journey {
   }
 
   Duration get waitingTime => timeInMode(VehicleMode.nakapila);
-  Duration get movingTime => totalTime - waitingTime - timeInMode(VehicleMode.paused);
+
+  /// Moving = kabuuang oras MINUS ang nakatira sa pila at naka-pause.
+  /// Walang segomento (= <2 points) ay hindi pa natutukoy — ibinabalik
+  /// zero para hindi lumabas ang maling malaking bilang.
+  Duration get movingTime {
+    if (points.length < 2) return Duration.zero;
+    final rest = waitingTime + timeInMode(VehicleMode.paused);
+    final d = totalTime - rest;
+    return d.isNegative ? Duration.zero : d;
+  }
 
   Map<String, dynamic> toJson() => {
         'userId': userId,

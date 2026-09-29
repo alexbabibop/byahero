@@ -16,9 +16,8 @@ import 'journey_store.dart';
 /// - Offline: LAHAT ng byahe ay laging nasesave sa JourneyStore (sqflite)
 ///   kahit walang account — auto-sync sa cloud kapag nag-login.
 class JourneyTracker extends ChangeNotifier {
-  JourneyTracker({JourneyStore? store, FirestoreService? fs})
-      : store = store ?? JourneyStore(),
-        fs = fs;
+  JourneyTracker({JourneyStore? store, this.fs})
+      : store = store ?? JourneyStore();
 
   final JourneyStore store;
   final FirestoreService? fs;
@@ -161,19 +160,19 @@ class JourneyTracker extends ChangeNotifier {
 
   void _restartListener({required int distanceFilter}) {
     _sub?.cancel();
-    // Tinitingnan lang ang mode para magpili ng dalas ng pagkuha ng punto:
-    // 10m kapag gumagalaw, 40m+ kapag nakapila (battery saver).
+    // Adaptive polling (totoo na): maliit ang hakbang kapag gumagalaw,
+    // malaki kapag nakapila — para tipid sa baterya.
     final filter = distanceFilter > 0
         ? distanceFilter
         : ((mode == VehicleMode.nakapila || mode == VehicleMode.paused) ? 40 : 10);
-    const settings = LocationSettings(
-        accuracy: LocationAccuracy.high, distanceFilter: 10);
-    _sub = Geolocator.getPositionStream(locationSettings: settings).listen(_onPosition);
-    // Panatilihin ang halaga para sa pag-audit/logging ng adaptive filter.
-    _lastFilterM = filter;
+    _sub = Geolocator.getPositionStream(
+      locationSettings: LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: filter,
+      ),
+    ).listen(_onPosition);
   }
 
-  int _lastFilterM = 10;
   bool _geofenceHit = false;
 
   Future<void> _onPosition(Position pos) async {

@@ -417,7 +417,7 @@ class _HomeTrackerScreenState extends State<HomeTrackerScreen> {
                     fontSize: 20,
                     fontWeight: FontWeight.w900,
                     color: color,
-                    fontFeatures: [ui.FontFeature.tabularFigures()])),
+                    fontFeatures: const [ui.FontFeature.tabularFigures()])),
           ],
         ),
       ),
@@ -488,12 +488,10 @@ class _LiveMapCardState extends State<_LiveMapCard> {
 
   void _followTo(Position p) {
     try {
-      final cam = _map.camera;
-      if (cam == null) return;
-      _map.move(LatLng(p.latitude, p.longitude), cam.zoom);
+      _map.move(LatLng(p.latitude, p.longitude), _map.camera.zoom);
     } catch (_) {
-      // MapController hindi pa attached — safe na bahala, susunod sa
-      // unang GPS fix via onMapReady.
+      // MapController hindi pa attached — susunod sa unang GPS fix
+      // ang onMapReady callback.
     }
   }
 
@@ -538,13 +536,11 @@ class _LiveMapCardState extends State<_LiveMapCard> {
     final marks = <Marker>[];
     if (pts.isNotEmpty) {
       marks.add(_pin(LatLng(pts.first.lat, pts.first.lng),
-          const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 15),
-          Colors.green.shade700));
+          Icons.play_arrow_rounded, Colors.green.shade700));
     }
     final dest = widget.dest;
     if (dest != null) {
-      marks.add(_pin(dest, const Icon(Icons.flag_rounded, color: Colors.white, size: 15),
-          AppTheme.brandRed));
+      marks.add(_pin(dest, Icons.flag_rounded, AppTheme.brandRed));
     }
     final p = _pos;
     if (p != null) {
@@ -585,7 +581,9 @@ class _LiveMapCardState extends State<_LiveMapCard> {
                     ? LatLng(p.latitude, p.longitude)
                     : const LatLng(14.5995, 120.9842),
                 initialZoom: 15.5,
-                onLongPress: widget.onLongPress,
+                onLongPress: widget.onLongPress == null
+                    ? null
+                    : (tap, point) => widget.onLongPress!(point),
                 onMapReady: () {
                   final pos = _pos;
                   if (pos != null) _followTo(pos);
@@ -690,7 +688,7 @@ class _LiveMapCardState extends State<_LiveMapCard> {
     );
   }
 
-  Marker _pin(LatLng at, Icon icon, Color bg) {
+  Marker _pin(LatLng at, IconData glyph, Color bg) {
     return Marker(
       point: at,
       width: 30,
@@ -707,7 +705,7 @@ class _LiveMapCardState extends State<_LiveMapCard> {
                 offset: const Offset(0, 2)),
           ],
         ),
-        child: Icon(icon, size: 15),
+        child: Icon(glyph, size: 15, color: Colors.white),
       ),
     );
   }

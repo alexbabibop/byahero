@@ -138,32 +138,32 @@ class AppTheme {
           borderRadius: BorderRadius.all(Radius.circular(radius)),
         ),
       ),
-      inputDecorationTheme: InputDecorationTheme(
+      inputDecorationTheme: const InputDecorationTheme(
         filled: true,
         fillColor: Colors.white,
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        hintStyle: const TextStyle(color: muted),
-        labelStyle: const TextStyle(color: muted),
+            EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        hintStyle: TextStyle(color: muted),
+        labelStyle: TextStyle(color: muted),
         prefixIconColor: muted,
         suffixIconColor: muted,
-        border: const OutlineInputBorder(
+        border: OutlineInputBorder(
           borderRadius: BorderRadius.all(Radius.circular(radius)),
           borderSide: BorderSide(color: line),
         ),
-        enabledBorder: const OutlineInputBorder(
+        enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.all(Radius.circular(radius)),
           borderSide: BorderSide(color: line),
         ),
-        focusedBorder: const OutlineInputBorder(
+        focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.all(Radius.circular(radius)),
           borderSide: BorderSide(color: brandRed, width: 1.8),
         ),
-        errorBorder: const OutlineInputBorder(
+        errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.all(Radius.circular(radius)),
           borderSide: BorderSide(color: Color(0xFFB3261E)),
         ),
-        focusedErrorBorder: const OutlineInputBorder(
+        focusedErrorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.all(Radius.circular(radius)),
           borderSide: BorderSide(color: Color(0xFFB3261E), width: 1.8),
         ),
@@ -175,17 +175,17 @@ class AppTheme {
           foregroundColor: WidgetStateProperty.resolveWith((s) =>
               s.contains(WidgetState.selected) ? Colors.white : ink),
           side: const WidgetStatePropertyAll(BorderSide(color: line)),
-          textStyle: WidgetStatePropertyAll(const TextStyle(
+          textStyle: const WidgetStatePropertyAll(TextStyle(
               fontSize: 14, fontWeight: FontWeight.w800)),
         ),
       ),
-      chipTheme: ChipThemeData(
+      chipTheme: const ChipThemeData(
         backgroundColor: Colors.white,
         selectedColor: brandRed,
         labelStyle:
-            const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-        side: const BorderSide(color: line),
-        shape: const RoundedRectangleBorder(
+            TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+        side: BorderSide(color: line),
+        shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.all(Radius.circular(14)),
         ),
         showCheckmark: false,
