@@ -96,6 +96,49 @@ jobs:
                   print("app patched")
           EOF
 
+      # OPTIONAL pero ito ang ginagawang permanent ang SHA-1 ng app.
+      # Kapag wala, gumagamit ang debug key ng runner (bago-bago ang SHA-1,
+      # kaya hindi tuloy-tuloy ang Google Sign-In).
+      - name: Create signing keystore from secret (optional)
+        run: |
+          if [ -z "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
+            echo "::notice::Walang ANDROID_KEYSTORE_BASE64 — debug signing ang gagamitin (SHA-1 = pabagu-bago)."
+            exit 0
+          fi
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/upload-keystore.jks
+          python3 - <<'EOF'
+          import pathlib
+          p = pathlib.Path("android/app/build.gradle.kts")
+          t = p.read_text()
+          if "upload-keystore.jks" in t:
+              print("keystore already configured")
+              raise SystemExit(0)
+          block = '''    signingConfigs {
+        create("release") {
+            storeFile = file("upload-keystore.jks")
+            storePassword = System.getenv("KS_STORE_PASS")
+            keyAlias = System.getenv("KS_KEY_ALIAS")
+            keyPassword = System.getenv("KS_KEY_PASS")
+        }
+    }
+
+'''
+          assert t.count("android {\n") >= 1, "android block not found"
+          t = t.replace("android {\n", "android {\n" + block, 1)
+          # Ang release build ay gagamit na ng sariling keystore (hindi debug),
+          # kaya hindi na pabagu-bago ang SHA-1 ng app.
+          old = 'signingConfig = signingConfigs.getByName("debug")'
+          assert t.count(old) == 1, "release signingConfig not found"
+          t = t.replace(old, 'signingConfig = signingConfigs.getByName("release")')
+          p.write_text(t)
+          print("keystore wired into build.gradle.kts")
+          EOF
+          grep -n "signingConfig\|storeFile" android/app/build.gradle.kts || true
+        env:
+          KS_STORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+          KS_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KS_KEY_PASS: ${{ secrets.ANDROID_KEY_PASS }}
+
       - name: pub get
         run: flutter pub get
 
@@ -108,8 +151,11 @@ jobs:
       - name: Build release APK
         run: flutter build apk --release
 
-      - name: Print APK SHA-1 (iregister sa Firebase para sa Google Sign-In)
-        run: keytool -printcert -jarfile build/app/outputs/flutter-apk/app-release.apk | grep -i sha1 || true
+      - name: Print APK SHA-1/SHA-256 (iregister sa Firebase para sa Google Sign-In)
+        run: |
+          BT=$(ls -d "$ANDROID_SDK_ROOT"/build-tools/* | tail -1)
+          "$BT/apksigner" verify --print-certs build/app/outputs/flutter-apk/app-release.apk 2>/dev/null \
+            | grep -Ei "SHA-1|SHA-256" || true
 
       - name: Upload APK
         uses: actions/upload-artifact@v4

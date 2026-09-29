@@ -77,13 +77,63 @@ firebase deploy --only firestore:rules,storage
 
 ---
 
-## 3. Google Maps API key
+## 3. Mapa: OpenStreetMap (WALANG API KEY, WALANG bayad)
 
-1. https://console.cloud.google.com → piliin ang Firebase project → APIs & Services → i-enable ang **Maps SDK for Android**.
-2. Credentials → Create Credentials → API key → i-restrict sa Android apps + package name + SHA-1 (makukuha via `cd android; ./gradlew signingReport` kapag may Android SDK ka na).
-3. Ilagay ang key sa isa sa dalawa:
-   - **Local run:** `flutter run --dart-define=MAPS_API_KEY=PASTE_KEY_HERE`
-   - **CI build:** ilagay bilang GitHub Secret na `MAPS_API_KEY` (tingnan sa Sec 5).
+Hindi na kailangan ng Google Maps key. Ang app ay gumagamit ng
+**OpenStreetMap + CARTO tiles** (libre, walang billing, walang credit card).
+
+Kung offline: gumagana pa rin ang tracker at nakikita mo pa rin ang live
+coordinates sa ilalim ng mapa — walang tiles lang.
+
+Kung gusto mo talagang Google Maps (pale, libeng tier, pero kailangan ng
+credit card para sa verification):
+1. https://console.cloud.google.com → project → APIs & Services → **Maps SDK for Android**.
+2. Credentials → Create Credentials → API key.
+3. I-set bilang GitHub Secret na `MAPS_API_KEY` (Sec 5d).
+> ⚠️ Kung gagamit ka nito, dapat i-restore ang `google_maps_flutter` sa
+> `pubspec.yaml` at ang map card sa `lib/screens/home_tracker_screen.dart`,
+> at kailangan ng `MAPS_API_KEY` secret. Default ngayon: OSM (recommended).
+
+---
+
+## 3b. Signing keystore (IMPORTANT para sa Google Sign-In)
+
+Bawat GitHub Actions run ay gumagamit ng **bagong debug key**, kaya pabagu-bago
+ang SHA-1 — at dahil doon, paulit-ulit na nai-error ang "Continue with Google"
+(error code 10). Para maging permanent, gumawa tayo ng sarili mong keystore
+(isang beses lang) at ilalagay sa GitHub Secrets.
+
+### 4a. Gumawa ng keystore (isang beses lang, sa PC mo)
+```powershell
+cd "$env:USERPROFILE"
+keytool -genkeypair -v -keystore byahero-upload.jks -storetype JKS `
+  -keyalg RSA -keysize 2048 -validity 10000 -alias upload `
+  -storepass "PASOK_MO" -keypass "PASOK_MO" `
+  -dname "CN=ByaHero, OU=Dev, O=alexbabibop, L=Manila, C=PH"
+```
+> **Itabi ang password somewhere safe** — kailangan mo ito para sa Play Store
+> upload mamaya. Pakigawa ng backup file o itabi sa password manager.
+
+### 4b. I-base64 (para mailagay sa GitHub Secret)
+```powershell
+$bytes = [System.IO.File]::ReadAllBytes("$env:USERPROFILE\byahero-upload.jks")
+$encoded = [Convert]::ToBase64String($bytes)
+Set-Clipboard $encoded
+```
+Nandyan na sa clipboard. I-paste sa mga secrets (Sec 5d):
+`ANDROID_KEYSTORE_BASE64` (yung clipboard), `ANDROID_KEYSTORE_PASS`,
+`ANDROID_KEY_ALIAS` (= `upload`), `ANDROID_KEY_PASS`.
+
+### 4c. Ikuha ang SHA-1 (para i-register sa Firebase)
+Pagkatapos mag-push at mag-green ang CI build:
+1. https://console.firebase.google.com → project `byahero-3dea7` →
+   **Project settings** (gear) → **Android app**.
+2. **Add fingerprint** → i-paste ang SHA-1 na ipinakita sa CI log.
+3. I-download ang `google-services.json` → ilagay bilang secret na
+   `GOOGLE_SERVICES_JSON` (base64, gaya ng 4b).
+
+Kapag naka-sign-in na nang stable: kahit mag-push ulit, **same SHA-1** ang
+lalabas at tuloy-tuloy ang Google Sign-In.
 
 ---
 
@@ -92,22 +142,32 @@ firebase deploy --only firestore:rules,storage
 ```powershell
 cd "C:\Users\COS - Brian\Documents\Default Project\byahero"
 flutter pub get
-flutter analyze
-flutter run --dart-define=MAPS_API_KEY=PASTE_KEY_HERE
+flutter analyze     # dapat: "No issues found!"
+flutter test        # dapat: "All tests passed!"
+flutter run
 ```
 
-Test checklist:
-- [ ] Start Journey → palitan ng Vehicle mode → makita ang color dots.
-- [ ] Pause/Resume/End gumagana.
-- [ ] Proof Camera nagbubukas (live only, walang gallery button).
-- [ ] PDF Preview nagge-generate.
-- [ ] Community Feed (gagana lang kapag connected ang Firebase).
+Test checklist (QA):
+- [ ] **Start Journey** → nag-i-start ang timer, may live marker sa mapa.
+- [ ] **Long-press sa mapa** → nauu-set ang destination (pindin ang Start).
+- [ ] **Pindin ang mode chip** (Bus / Nakapila / Jeep / Lakad / Private) → kulay ng ruta ay nagbabago.
+- [ ] **Pause / Resume** → naka-pause ang timer; pag-resume, bumabalik ang dating mode.
+- [ ] **End Trip** → nai-save sa "Mga Byahe" tab (kahit walang internet, kahit walang account).
+- [ ] **Mga Byahe tab** → may listahan + "Sync ngayon" + PDF button.
+- [ ] **Account tab** → Register/Login (may validation), at may "Guest mode" note.
+- [ ] **Proof Camera** → live capture lang; may thumbnail + SHA-256 pagkatapos.
+- [ ] **PDF** → nagge-generate, may share/print toolbar.
+- [ ] **Community** → nag-hide ang composer kapag guest (members-only).
 
 Local APK:
 ```powershell
-flutter build apk --release --dart-define=MAPS_API_KEY=PASTE_KEY_HERE
+flutter build apk --release
 # output: build\app\outputs\flutter-apk\app-release.apk
 ```
+
+> Ang `android/` folder ay **hindi** nasa git — d automatically itong binubuo ng
+> CI (`flutter create .`). Kapag nagbu-build ka locally at wala ang android/,
+> una muna: `flutter create . --org com.alexbabibop --project-name byahero --platforms android`.
 
 ---
 
@@ -141,14 +201,27 @@ Kung hihingi ng login: gumamit ng **Personal Access Token** (GitHub → Settings
 3. Kapag green check na → buksan ang run → **Artifacts** → i-download ang `byahero-apk` → nasa loob ang `app-release.apk`.
 4. Ilipat sa phone → install → test.
 
-### 5d. Secrets (para gumana ang Maps + Firebase sa cloud build)
+### 5d. Secrets (para gumana ang Firebase + Google Sign-In sa cloud build)
 Repo → Settings → Secrets and variables → Actions → New repository secret:
-- `MAPS_API_KEY` = ang Google Maps key mo.
-- `GOOGLE_SERVICES_JSON` (optional) = ang buong `google-services.json`, naka-base64:
+
+| Secret | Kailangan? | Ano |
+|---|---|---|
+| `ANDROID_KEYSTORE_BASE64` | **Opo** (para stable ang Google Sign-In) | base64 ng `byahero-upload.jks` |
+| `ANDROID_KEYSTORE_PASS` | **Opo** | store password mo |
+| `ANDROID_KEY_ALIAS` | **Opo** | `upload` |
+| `ANDROID_KEY_PASS` | **Opo** | key password mo |
+| `GOOGLE_SERVICES_JSON` | Opo (para mapagana ang Google Sign-In sa CI) | base64 ng `google-services.json` |
+| `MAPS_API_KEY` | **Hindi na kailangan** | OSM na ang mapa |
+
+Base64 ng file (para i-paste sa secret):
 ```powershell
-[Convert]::ToBase64String([IO.File]::ReadAllBytes("android\app\google-services.json"))
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("byahero-upload.jks"))
+# o para sa google-services.json:
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("google-services.json"))
 ```
-I-paste ang output bilang secret value. Ang workflow ang magbabalik nito sa `android/app/google-services.json` tuwing build.
+
+> Kapag walang keystore secret, gumagana pa rin ang build (debug signing) —
+> pero pabagu-bago ang SHA-1 kaya maaaring ma-error ang "Continue with Google".
 
 ---
 
