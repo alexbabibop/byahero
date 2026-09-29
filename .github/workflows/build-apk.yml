@@ -96,38 +96,17 @@ jobs:
                   print("app patched")
           EOF
 
-      - name: Inject Maps API key into manifest (only with secret)
-        run: |
-          if [ -z "${{ secrets.MAPS_API_KEY }}" ]; then
-            echo "no maps key, skipping"
-            exit 0
-          fi
-          python3 - <<'EOF'
-          import os, re, pathlib
-          key = os.environ.get("MAPS_KEY", "")
-          assert key, "empty key"
-          p = pathlib.Path("android/app/src/main/AndroidManifest.xml")
-          t = p.read_text()
-          meta = f'\n        <meta-data android:name="com.google.android.geo.API_KEY" android:value="{key}" />'
-          if "com.google.android.geo.API_KEY" not in t:
-              t, n = re.subn(r"(<application[^>]*>)", r"\1" + meta, t, count=1)
-              assert n == 1, "application tag not found"
-              p.write_text(t)
-              print("maps key injected")
-          else:
-              print("maps key already present")
-          EOF
-        env:
-          MAPS_KEY: ${{ secrets.MAPS_API_KEY }}
-
       - name: pub get
         run: flutter pub get
 
-      - name: Analyze
-        run: flutter analyze || true
+      - name: Analyze (errors only fail the build)
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Unit tests
+        run: flutter test
 
       - name: Build release APK
-        run: flutter build apk --release --dart-define=MAPS_API_KEY=${{ secrets.MAPS_API_KEY }}
+        run: flutter build apk --release
 
       - name: Print APK SHA-1 (iregister sa Firebase para sa Google Sign-In)
         run: keytool -printcert -jarfile build/app/outputs/flutter-apk/app-release.apk | grep -i sha1 || true

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 /// Vehicle modes + route colors, ayon sa PRD spec.
@@ -36,13 +38,24 @@ class RoutePoint {
         'mode': mode.name,
         'speedKmh': speedKmh,
       };
+
+  factory RoutePoint.fromJson(Map<String, dynamic> m) => RoutePoint(
+        lat: (m['lat'] as num).toDouble(),
+        lng: (m['lng'] as num).toDouble(),
+        timestamp: DateTime.parse(m['ts'] as String),
+        mode: VehicleMode.values.firstWhere(
+          (v) => v.name == m['mode'],
+          orElse: () => VehicleMode.bus,
+        ),
+        speedKmh: (m['speedKmh'] as num?)?.toDouble() ?? 0,
+      );
 }
 
 enum JourneyState { idle, active, paused, finished }
 
 class Journey {
   final String id;
-  final String userId;
+  String userId; // mutable: guest → uid kapag nag-login
   final DateTime startedAt;
   DateTime? endedAt;
   double? destLat;
@@ -52,6 +65,41 @@ class Journey {
   final List<String> autoLogs = [];
 
   Journey({required this.id, required this.userId, required this.startedAt});
+
+  /// Reconstruction mula sa local (sqflite) row.
+  factory Journey.fromStorage(Map<String, dynamic> m) {
+    final j = Journey(
+      id: m['id'] as String,
+      userId: m['user_id'] as String,
+      startedAt:
+          DateTime.fromMillisecondsSinceEpoch(m['started_at'] as int),
+    )
+      ..endedAt = m['ended_at'] == null
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(m['ended_at'] as int)
+      ..destLat = (m['dest_lat'] as num?)?.toDouble()
+      ..destLng = (m['dest_lng'] as num?)?.toDouble()
+      ..destLabel = m['dest_label'] as String?;
+    final pts = (jsonDecode(m['points'] as String) as List).toList();
+    j.points.addAll(
+        pts.map((e) => RoutePoint.fromJson(e as Map<String, dynamic>)));
+    final logs = (jsonDecode(m['auto_logs'] as String) as List).toList();
+    j.autoLogs.addAll(logs.cast<String>());
+    return j;
+  }
+
+  Map<String, dynamic> toStorage({required int synced}) => {
+        'id': id,
+        'user_id': userId,
+        'started_at': startedAt.millisecondsSinceEpoch,
+        'ended_at': endedAt?.millisecondsSinceEpoch,
+        'dest_lat': destLat,
+        'dest_lng': destLng,
+        'dest_label': destLabel,
+        'points': jsonEncode(points.map((p) => p.toJson()).toList()),
+        'auto_logs': jsonEncode(autoLogs),
+        'synced': synced,
+      };
 
   Duration get totalTime =>
       (endedAt ?? DateTime.now()).difference(startedAt);

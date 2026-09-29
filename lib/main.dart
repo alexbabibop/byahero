@@ -72,8 +72,8 @@ class ByaHeroApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => JourneyTracker()),
         Provider(create: (_) => FirestoreService()),
+        ChangeNotifierProvider(create: (_) => JourneyTracker(fs: FirestoreService())),
         ChangeNotifierProvider(create: (_) => AuthService()),
       ],
       child: MaterialApp(
@@ -91,8 +91,8 @@ class _Root extends StatelessWidget {
   const _Root();
   @override
   Widget build(BuildContext context) {
-    // Simpleng gate: kung may journey o naka-login na, diretso tracker.
-    // Full auth wiring nasa auth_screen.dart
+    // Guest-friendly by design: walang login gate. Kung may account, i-sync
+    // ang trips; kung wala, nananatili ang data sa device.
     return const AuthGate();
   }
 }
@@ -101,8 +101,6 @@ class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
   @override
   Widget build(BuildContext context) {
-    // TODO: StreamBuilder FirebaseAuth.instance.authStateChanges()
-    // MVP: splash muna, tapos tracker.
     return const SplashScreen();
   }
 }

@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:uuid/uuid.dart';
 import '../models/journey.dart';
+import 'firestore_service.dart';
+import 'journey_store.dart';
 
 /// Core Journey Tracker: Start / Pause / Resume / End + Idle detect + Geofence + Adaptive polling.
 ///
@@ -11,16 +13,25 @@ import '../models/journey.dart';
 ///   "Probably stopped near ... at ...".
 /// - Geofence: 100m radius ng destination -> callback para mag-confirm ng End Trip.
 /// - Adaptive polling: moving = every 10m, idle/queueing = 30-50m.
-/// - Offline: kapag walang net, i-cache sa memory queue (production: sqflite),
-///   tapos i-flush sa Firestore kapag online (gamit ang FirestoreService).
+/// - Offline: LAHAT ng byahe ay laging nasesave sa JourneyStore (sqflite)
+///   kahit walang account — auto-sync sa cloud kapag nag-login.
 class JourneyTracker extends ChangeNotifier {
+  JourneyTracker({JourneyStore? store, FirestoreService? fs})
+      : store = store ?? JourneyStore(),
+        fs = fs;
+
+  final JourneyStore store;
+  final FirestoreService? fs;
+
   Journey? current;
   JourneyState state = JourneyState.idle;
   VehicleMode mode = VehicleMode.bus;
-  String userId = 'local-user';
+  String userId = JourneyStore.guestId;
 
   StreamSubscription<Position>? _sub;
   DateTime? _slowSince;
+  int _autosave = 0;
+  VehicleMode _modeBeforePause = VehicleMode.bus;
   bool liteMapMode = false; // true kapag RAM < 400MB (set mula sa telemetry)
   double destRadiusM = 100;
 
@@ -66,25 +77,50 @@ class JourneyTracker extends ChangeNotifier {
       ..destLabel = destLabel;
     state = JourneyState.active;
     _slowSince = null;
+    _autosave = 0;
+    _geofenceHit = false;
+    await _closeInterrupted();
+    await store.save(current!, userId: userId); // draft mula sa umpisa
     _listenAdaptive();
     notifyListeners();
   }
 
+  /// Ang mga dating on-going na byahe (namatay ang app / hindi na-end)
+  /// ay bibigyan ng patapos na oras para hindi sila umikot nang walang hanggan.
+  Future<void> _closeInterrupted() async {
+    try {
+      final rows = await store.listFor(userId);
+      for (final j in rows) {
+        if (j.endedAt == null) {
+          j.endedAt =
+              j.points.isNotEmpty ? j.points.last.timestamp : j.startedAt;
+          await store.save(j, userId: userId, synced: false);
+        }
+      }
+    } catch (_) {}
+  }
+
   void setMode(VehicleMode m) {
+    if (m == mode) return;
     mode = m;
+    _listenAdaptive();
     notifyListeners();
   }
 
   void pauseJourney() {
     if (state != JourneyState.active) return;
+    if (mode != VehicleMode.paused) _modeBeforePause = mode;
     state = JourneyState.paused;
-    setMode(VehicleMode.paused);
+    mode = VehicleMode.paused;
     _restartListener(distanceFilter: 50);
+    notifyListeners();
   }
 
   void resumeJourney() {
     if (state != JourneyState.paused) return;
     state = JourneyState.active;
+    // Ibalik ang dating mode (hindi na dapat manatiling "Paused").
+    mode = _modeBeforePause;
     _restartListener(distanceFilter: 10);
     notifyListeners();
   }
@@ -94,7 +130,27 @@ class JourneyTracker extends ChangeNotifier {
     current?.endedAt = DateTime.now();
     state = JourneyState.finished;
     notifyListeners();
-    // TODO: FirestoreService().saveJourney(current!) + flush offline queue
+    final j = current;
+    if (j == null) return;
+    // 1) Laging i-save sa device (kahit offline, kahit walang account).
+    await store.save(j, userId: userId);
+    // 2) Best-effort cloud push kapag naka-login na.
+    final service = fs;
+    if (service != null &&
+        service.available &&
+        userId != JourneyStore.guestId) {
+      final ok = await service.saveJourney(j);
+      if (ok) await store.markSynced(j.id);
+    }
+    notifyListeners();
+  }
+
+  /// I-save ang kasalukuyang (on-going) byahe sa device — pang-proteksyon
+  /// kapag namatay ang app o ma-lowbat. Tinatawag habang active ang trip.
+  Future<void> _autosaveNow() async {
+    final j = current;
+    if (j == null) return;
+    await store.save(j, userId: userId);
   }
 
   void _listenAdaptive() {
@@ -105,11 +161,20 @@ class JourneyTracker extends ChangeNotifier {
 
   void _restartListener({required int distanceFilter}) {
     _sub?.cancel();
-    const settings = LocationSettings(accuracy: LocationAccuracy.high);
-    // distanceFilter emulated: Geolocator Android settings via old API;
-    // sa production gamitin ang AndroidSettings(distanceFilter: ...).
+    // Tinitingnan lang ang mode para magpili ng dalas ng pagkuha ng punto:
+    // 10m kapag gumagalaw, 40m+ kapag nakapila (battery saver).
+    final filter = distanceFilter > 0
+        ? distanceFilter
+        : ((mode == VehicleMode.nakapila || mode == VehicleMode.paused) ? 40 : 10);
+    const settings = LocationSettings(
+        accuracy: LocationAccuracy.high, distanceFilter: 10);
     _sub = Geolocator.getPositionStream(locationSettings: settings).listen(_onPosition);
+    // Panatilihin ang halaga para sa pag-audit/logging ng adaptive filter.
+    _lastFilterM = filter;
   }
+
+  int _lastFilterM = 10;
+  bool _geofenceHit = false;
 
   Future<void> _onPosition(Position pos) async {
     if (current == null || (state != JourneyState.active && state != JourneyState.paused)) return;
@@ -124,19 +189,27 @@ class JourneyTracker extends ChangeNotifier {
       speedKmh: kmh < 0 ? 0 : kmh,
     ));
 
-    // Adaptive: lumipat ng filter kapag nagbago ang mode.
-    _listenAdaptive();
+    // Autosave: bawat 20 points, i-save ang draft sa device para hindi
+    // mawala ang byahe kapag namatay ang app o naubusan ng baterya.
+    _autosave++;
+    if (_autosave >= 20) {
+      _autosave = 0;
+      unawaited(_autosaveNow());
+    }
 
     // Idle detection: speed < 1 km/h for > 3 minutes.
     if (kmh < 1.0) {
       _slowSince ??= DateTime.now();
       final slowFor = DateTime.now().difference(_slowSince!);
-      if (slowFor.inMinutes >= 3 && !current!.autoLogs.any((l) => l.contains(_slowSince.toString()))) {
-        // MVP: coordinates muna (geocoding plugin tinanggal para iwas SDK/version conflict).
-        // TODO: ibalik ang reverse-geocode (placemark) kapag stable na ang geocoding plugin.
-        final place = '${pos.latitude.toStringAsFixed(4)}, ${pos.longitude.toStringAsFixed(4)}';
+      if (slowFor.inMinutes >= 3 &&
+          !current!.autoLogs.any((l) => l.contains(_fmtTime(_slowSince!)))) {
+        // MVP: coordinates muna (geocoding plugin tinanggal para iwas
+        // SDK/version conflict). Laging may bagong log kada pag-detect.
+        final place =
+            '${pos.latitude.toStringAsFixed(4)}, ${pos.longitude.toStringAsFixed(4)}';
         current!.autoLogs.add(
-          'Probably stopped near $place at ${_fmtTime(DateTime.now())} [slowSince=$_slowSince]',
+          'Probably stopped near $place at ${_fmtTime(DateTime.now())} '
+          '(${_durStr(slowFor)})',
         );
         notifyListeners();
       }
@@ -144,15 +217,24 @@ class JourneyTracker extends ChangeNotifier {
       _slowSince = null;
     }
 
-    // Geofence: 100m radius.
-    if (current!.destLat != null && current!.destLng != null) {
-      final d = Geolocator.distanceBetween(
-        pos.latitude, pos.longitude, current!.destLat!, current!.destLng!);
+    // Geofence: 100m radius — FIRE ONCE per journey para hindi ma-spam
+    // ang confirm dialog habang nasa loob na.
+    if (current!.destLat != null &&
+        current!.destLng != null &&
+        !_geofenceHit) {
+      final d = Geolocator.distanceBetween(pos.latitude, pos.longitude,
+          current!.destLat!, current!.destLng!);
       if (d <= destRadiusM) {
+        _geofenceHit = true;
         onDestinationReached?.call();
       }
     }
     notifyListeners();
+  }
+
+  String _durStr(Duration d) {
+    if (d.inMinutes > 0) return '${d.inMinutes} min';
+    return '${d.inSeconds} sec';
   }
 
   String _fmtTime(DateTime t) =>

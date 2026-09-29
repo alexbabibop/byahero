@@ -1,40 +1,96 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import '../models/journey.dart';
 import '../models/community_post.dart';
 
-/// Firestore wiring + offline queue stub.
-/// Production: palitan ang _queue ng sqflite table at i-flush kapag online
-/// (connectivity_plus listener).
+/// Firestore wiring — laging safe kahit walang Firebase config ang build.
+/// Ang mga write ay best-effort: kapag offline, ibabalik false at hayaang
+/// mag-abang ang local store (tingnan ang SyncService).
 class FirestoreService {
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
-  final List<Map<String, dynamic>> _queue = [];
+  FirebaseFirestore? _dbInstance;
 
-  Future<void> saveJourney(Journey j, {String? proofPhotoUrl, String? hash}) async {
-    final data = {...j.toJson(), 'proofPhotoUrl': proofPhotoUrl, 'hash': hash};
+  bool get available {
     try {
-      await _db.collection('journeys').doc(j.id).set(data);
+      return Firebase.apps.isNotEmpty;
     } catch (_) {
-      _queue.add({'col': 'journeys', 'id': j.id, 'data': data});
+      return false;
     }
   }
 
-  Future<void> votePost(String postId, bool up) async {
-    await _db.collection('posts').doc(postId).update({
-      up ? 'upvotes' : 'downvotes': FieldValue.increment(1),
-    });
+  FirebaseFirestore get _db {
+    final cached = _dbInstance;
+    if (cached != null) return cached;
+    final db = FirebaseFirestore.instance;
+    _dbInstance = db;
+    return db;
   }
 
-  Stream<QuerySnapshot> feedStream() =>
-      _db.collection('posts').orderBy('createdAt', descending: true).limit(50).snapshots();
+  static const _timeout = Duration(seconds: 20);
 
-  Future<void> addPost(CommunityPost p) async {
-    await _db.collection('posts').doc(p.id).set(p.toJson());
+  /// I-push ang byahe sa cloud. true = naituloy (o kasalukuyang nakasulat).
+  Future<bool> saveJourney(Journey j, {String? proofPhotoUrl, String? hash}) async {
+    if (!available) return false;
+    try {
+      await _db
+          .collection('journeys')
+          .doc(j.id)
+          .set({
+            ...j.toJson(),
+            'proofPhotoUrl': proofPhotoUrl,
+            'hash': hash,
+            'updatedAt': FieldValue.serverTimestamp(),
+          })
+          .timeout(_timeout);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> votePost(String postId, bool up) async {
+    if (!available) return false;
+    try {
+      await _db.collection('posts').doc(postId).update({
+        up ? 'upvotes' : 'downvotes': FieldValue.increment(1),
+      }).timeout(_timeout);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Stream<QuerySnapshot>? feedStream() {
+    if (!available) return null;
+    try {
+      return _db
+          .collection('posts')
+          .orderBy('createdAt', descending: true)
+          .limit(50)
+          .snapshots();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<bool> addPost(CommunityPost p) async {
+    if (!available) return false;
+    try {
+      await _db.collection('posts').doc(p.id).set(p.toJson()).timeout(_timeout);
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<void> sendBugReport(Map<String, dynamic> report) async {
-    await _db.collection('bug_reports').add({
-      ...report,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
+    if (!available) return;
+    try {
+      await _db.collection('bug_reports').add({
+        ...report,
+        'createdAt': FieldValue.serverTimestamp(),
+      }).timeout(_timeout);
+    } catch (_) {}
   }
 }

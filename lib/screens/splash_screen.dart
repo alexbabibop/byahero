@@ -26,7 +26,7 @@ class _SplashScreenState extends State<SplashScreen>
     )..forward();
     _scale = CurvedAnimation(parent: _c, curve: Curves.elasticOut);
     _fade = CurvedAnimation(parent: _c, curve: Curves.easeIn);
-    Timer(const Duration(milliseconds: 2300), () {
+    Timer(const Duration(milliseconds: 1600), () {
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
