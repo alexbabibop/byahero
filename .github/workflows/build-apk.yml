@@ -102,37 +102,11 @@ jobs:
       - name: Create signing keystore from secret (optional)
         run: |
           if [ -z "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
-            echo "::notice::Walang ANDROID_KEYSTORE_BASE64 — debug signing ang gagamitin (SHA-1 = pabagu-bago)."
+            echo "::notice::Walang ANDROID_KEYSTORE_BASE64 - debug signing ang gagamitin (SHA-1 = pabagu-bago)."
             exit 0
           fi
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/upload-keystore.jks
-          python3 - <<'EOF'
-          import pathlib
-          p = pathlib.Path("android/app/build.gradle.kts")
-          t = p.read_text()
-          if "upload-keystore.jks" in t:
-              print("keystore already configured")
-              raise SystemExit(0)
-          block = '''    signingConfigs {
-        create("release") {
-            storeFile = file("upload-keystore.jks")
-            storePassword = System.getenv("KS_STORE_PASS")
-            keyAlias = System.getenv("KS_KEY_ALIAS")
-            keyPassword = System.getenv("KS_KEY_PASS")
-        }
-    }
-
-'''
-          assert t.count("android {\n") >= 1, "android block not found"
-          t = t.replace("android {\n", "android {\n" + block, 1)
-          # Ang release build ay gagamit na ng sariling keystore (hindi debug),
-          # kaya hindi na pabagu-bago ang SHA-1 ng app.
-          old = 'signingConfig = signingConfigs.getByName("debug")'
-          assert t.count(old) == 1, "release signingConfig not found"
-          t = t.replace(old, 'signingConfig = signingConfigs.getByName("release")')
-          p.write_text(t)
-          print("keystore wired into build.gradle.kts")
-          EOF
+          python3 .github/ci/patch_keystore.py
           grep -n "signingConfig\|storeFile" android/app/build.gradle.kts || true
         env:
           KS_STORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASS }}
